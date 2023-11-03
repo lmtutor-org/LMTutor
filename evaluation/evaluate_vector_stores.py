@@ -23,7 +23,7 @@ def evaluate_vector_store_performance(lmtutor, query_df):
         gt_embed = lmtutor.get_embedding(row["ground_truth"])
         for data, _, _ in res:
             doc_embed = lmtutor.get_embedding(data)
-            l2_dist = np.linalg.norm(doc_embed - gt_embed)
+            l2_dist = np.linalg.norm(np.array(doc_embed) - np.array(gt_embed))
             per_doc_l2.append(l2_dist)
         
         avg_gt_l2 = np.average(per_doc_l2)
