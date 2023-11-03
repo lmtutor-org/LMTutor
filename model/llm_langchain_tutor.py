@@ -27,7 +27,7 @@ PIPELINE_TYPE = {
 
 
 class LLMLangChainTutor():
-    def __init__(self, doc_loader='dir', embedding='openai', llm='openai', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cuda',llm_device='cuda') -> None:
+    def __init__(self, doc_loader='dir', embedding='instruct_embedding', llm='hf_lmsys/vicuna-13b-v1.3', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cuda',llm_device='cuda') -> None:
         self.openai_key = openai_key
         self.llm_name = llm
         self.embed_device = embed_device
@@ -48,7 +48,7 @@ class LLMLangChainTutor():
             self.embedding_model = OpenAIEmbeddings()
         
         elif embedding == 'instruct_embedding':
-            self.embedding_model = HuggingFaceInstructEmbeddings(query_instruction="Represent the query for retrieval: ", model_kwargs={'device':self.embed_device}, encode_kwargs={'batch_size':32})
+            self.embedding_model = HuggingFaceInstructEmbeddings(query_instruction="Represent the query for retrieval: ", cache_folder="new-cache/", model_kwargs={'device':self.embed_device}, encode_kwargs={'batch_size':32})
     
     
     def _vectorstore_loader(self, vector_store):
@@ -89,25 +89,19 @@ class LLMLangChainTutor():
     def load_vector_store(self, folder_path):
         self.gen_vectorstore = self.vector_store.load_local(folder_path=folder_path, embeddings=self.embedding_model)
 
-    def similarity_search_topk(self, query, k=4):
+    def similarity_search(self, query, k=4):
         retrieved_docs = self.gen_vectorstore.similarity_search(query, k=k)
-        
         return retrieved_docs
     
-    def similarity_search_thres(self, query, thres=0.8):
-        retrieval_result  = self.gen_vectorstore.similarity_search_with_score(query, k=10)
-        retrieval_result = [d[0] for d in retrieval_result]
-        
-        return retrieval_result
-
     def conversational_qa(self, user_input):
         # return self.qa({'question': user_input})
         FIRST_PROMPT = "A chat between a student user and a teaching assistant. The assistant gives helpful, detailed, and polite answers to the user's questions based on the context.\n"
         PROMPT_TEMPLTATE = "CONTEXT: {context} \n USER: {user_input} \n ASSISTANT:"
-        context = " \n ".join([each.page_content for each in self.similarity_search(user_input, k=5)])
+        context_list = [each.page_content for each in self.similarity_search(user_input, k=5)]
+        context = " \n ".join(context_list)
         if self.first_conversation:
             prompt = FIRST_PROMPT + PROMPT_TEMPLTATE.format(context=context, user_input=user_input)
-            self.first_conversation = False
+            # self.first_conversation = False
         else:
             prompt = self.memory.messages[-1] + "\n\n " + PROMPT_TEMPLTATE.format(context=context, user_input=user_input)
         
@@ -120,20 +114,34 @@ class LLMLangChainTutor():
         output = self.gen_pipe(prompt)[0]['generated_text']
         self.memory.add_message(prompt+output)
 
-        return output
+        return output, context_list
 
     def initialize_hf_llm(self):
         if not self.llm_name.startswith('hf'):
             raise NameError()
         
         llm_name = self.llm_name.split('_')[-1]
-        self.llm = AutoModelForCausalLM.from_pretrained(llm_name, temperature=0.7, torch_dtype=torch.float16).to(self.llm_device)
-        self.tokenizer = AutoTokenizer.from_pretrained(llm_name)
+        self.llm = AutoModelForCausalLM.from_pretrained(llm_name, temperature=0.7, torch_dtype=torch.float16, cache_dir="new-cache/").to(self.llm_device)
+        self.tokenizer = AutoTokenizer.from_pretrained(llm_name, cache_dir="new-cache/")
 
         self.gen_pipe = pipeline(PIPELINE_TYPE[llm_name], model=self.llm, tokenizer=self.tokenizer, device=self.llm_device, max_new_tokens=512, return_full_text=False)
 
         self.memory = ChatMessageHistory()
         self.first_conversation = True
+        print("HF initialization complete")
+
+    def similarity_search_topk(self, query, k=4):
+        retrieved_docs = self.gen_vectorstore.similarity_search(query, k=k)
+        return retrieved_docs
+    
+    def get_embedding(self, data):
+        return self.gen_vectorstore.embedding_function(data)
+
+    def similarity_search_thres(self, query, thres=0.8):
+        retrieval_result  = self.gen_vectorstore.similarity_search_with_score(query, k=10)
+        retrieval_result = [(d[0].page_content, d[0].metadata['source'], d[1]) for d in retrieval_result]
+        return retrieval_result
+
 
 if __name__ == '__main__':
     lmtutor = LLMLangChainTutor()
