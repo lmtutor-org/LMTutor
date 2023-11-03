@@ -16,17 +16,17 @@ def evaluate_vector_store_performance(lmtutor, query_df):
         res = lmtutor.similarity_search_thres(row['questions'])
         query_results.append(res)
 
-        avg_query_l2 = np.average([d[2] for d in res])
+        all_avg_query_l2.append(np.average([d[2] for d in res]))
 
         # Get similarity of retreived docs and answers
         per_doc_l2 = []
-        gt_embed = lmtutor.get_embedding(row["ground_truth"])
+        gt_embed = lmtutor.gen_vectorstore.embedding_function(row["ground_truth"])
         for data, _, _ in res:
-            doc_embed = lmtutor.get_embedding(data)
+            doc_embed = lmtutor.gen_vectorstore.embedding_function(data)
             l2_dist = np.linalg.norm(np.array(doc_embed) - np.array(gt_embed))
             per_doc_l2.append(l2_dist)
         
-        avg_gt_l2 = np.average(per_doc_l2)
+        all_avg_gt_l2.append(np.average(per_doc_l2))
         answer_results.append(per_doc_l2)
     
     query_df = query_df.assign(
