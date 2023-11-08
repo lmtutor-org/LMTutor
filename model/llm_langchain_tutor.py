@@ -96,19 +96,19 @@ class LLMLangChainTutor():
     #     print(len(docs))
     #     text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap) ### hyperparams
     #     self.splitted_documents = text_splitter.split_documents(docs)
-        def load_document(self, doc_path, glob='*.txt', chunk_size=480, chunk_overlap=0 ,separators=[". "]):
-            docs = self.doc_loader(doc_path, 
+    def load_document(self, doc_path, glob='*.txt', chunk_size=480, chunk_overlap=0 ,separators=[". "]):
+        docs = self.doc_loader(doc_path, 
                                glob=glob, 
                                show_progress=True, 
                                use_multithreading=True, 
                                max_concurrency=16).load() 
-            tokenizer = AutoTokenizer.from_pretrained("hkunlp/instructor-large", max_length=512, truncation=True)
-            text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
+        tokenizer = AutoTokenizer.from_pretrained("hkunlp/instructor-large", max_length=512, truncation=True)
+        text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
                                         tokenizer,
                                         chunk_size=chunk_size, 
                                         chunk_overlap=chunk_overlap, 
                                         separators=separators) ### hyperparams
-            self.splitted_documents = text_splitter.split_documents(docs)
+        self.splitted_documents = text_splitter.split_documents(docs)
     
     def generate_vector_store(self):
         self.gen_vectorstore = self.vector_store.from_documents(self.splitted_documents, self.embedding_model)
