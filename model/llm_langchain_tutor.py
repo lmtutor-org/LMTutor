@@ -21,13 +21,29 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
 from transformers import pipeline
 
+from langchain.document_loaders.base import BaseLoader
+from typing import List
+from langchain.schema.document import Document
+import fitz
+import re
+from langchain.document_loaders import PyMuPDFLoader
+from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
+from langchain.document_loaders.image import UnstructuredImageLoader
+from langchain.document_loaders import TextLoader
+from langchain.text_splitter import TokenTextSplitter
+from transformers import T5Tokenizer
+
+PIPELINE_TYPE = {
+    'lmsys/vicuna-13b-v1.3': 'text-generation'
+}
+
 PIPELINE_TYPE = {
     'lmsys/vicuna-7b-v1.3': 'text-generation'
 }
 
 
 class LLMLangChainTutor():
-    def __init__(self, doc_loader='dir', embedding='openai', llm='openai', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cuda',llm_device='cuda') -> None:
+    def __init__(self, doc_loader='dir', embedding='openai', llm='openai', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cpu',llm_device='cpu') -> None:
         self.openai_key = openai_key
         self.llm_name = llm
         self.embed_device = embed_device
@@ -74,11 +90,25 @@ class LLMLangChainTutor():
             self.memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer')
             self.qa = ConversationalRetrievalChain.from_llm(llm, self.gen_vectorstore.as_retriever(), memory=self.memory, return_source_documents=True)
 
-    def load_document(self, doc_path, glob='*.pdf', chunk_size=400, chunk_overlap=0):
-        docs = self.doc_loader(doc_path, glob=glob, show_progress=True, use_multithreading=True, max_concurrency=16).load() ### many doc loaders
-
-        text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap) ### hyperparams
-        self.splitted_documents = text_splitter.split_documents(docs)
+    # def load_document(self, doc_path, glob='*.pdf', chunk_size=400, chunk_overlap=0):
+    #     docs = self.doc_loader(doc_path, glob=glob, show_progress=True, use_multithreading=True, max_concurrency=16).load() 
+    #     # docs = self.doc_loader(doc_path, glob=glob, show_progress=True).load()### many doc loaders
+    #     print(len(docs))
+    #     text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap) ### hyperparams
+    #     self.splitted_documents = text_splitter.split_documents(docs)
+        def load_document(self, doc_path, glob='*.txt', chunk_size=480, chunk_overlap=0 ,separators=[". "]):
+            docs = self.doc_loader(doc_path, 
+                               glob=glob, 
+                               show_progress=True, 
+                               use_multithreading=True, 
+                               max_concurrency=16).load() 
+            tokenizer = AutoTokenizer.from_pretrained("hkunlp/instructor-large", max_length=512, truncation=True)
+            text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
+                                        tokenizer,
+                                        chunk_size=chunk_size, 
+                                        chunk_overlap=chunk_overlap, 
+                                        separators=separators) ### hyperparams
+            self.splitted_documents = text_splitter.split_documents(docs)
     
     def generate_vector_store(self):
         self.gen_vectorstore = self.vector_store.from_documents(self.splitted_documents, self.embedding_model)
@@ -136,9 +166,11 @@ class LLMLangChainTutor():
         self.first_conversation = True
 
 if __name__ == '__main__':
-    lmtutor = LLMLangChainTutor()
-    lmtutor.load_vector_store("/home/haozhang/axie/LMTutor/data/DSC-291-vector")
-    lmtutor.conversational_qa("What's the course?")
+    lmtutor = LLMLangChainTutor(embedding='instruct_embedding',embed_device='cpu', llm_device="cpu")
+    lmtutor.load_document(doc_path="/Users/lichenghu/Desktop/DSC-291-temp", glob='*.txt', chunk_size=480, chunk_overlap=0 ,separators=[". "] )
+    lmtutor.generate_vector_store()
+    lmtutor.save_vector_store("/Users/lichenghu/desktop/DSC-291-vector")
+    # lmtutor.conversational_qa("What's the course?")
 
         
     
