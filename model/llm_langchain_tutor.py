@@ -43,7 +43,7 @@ PIPELINE_TYPE = {
 
 
 class LLMLangChainTutor():
-    def __init__(self, doc_loader='dir', embedding='openai', llm='openai', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cpu',llm_device='cpu') -> None:
+    def __init__(self, doc_loader='dir', embedding='openai', llm='openai', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='gpu',llm_device='gpu') -> None:
         self.openai_key = openai_key
         self.llm_name = llm
         self.embed_device = embed_device
