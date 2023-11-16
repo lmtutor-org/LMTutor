@@ -11,6 +11,7 @@ from pdf2image import convert_from_path
 def pdf_to_txt_book(file_path,file_path_to_save):
     for filename in glob.glob(os.path.join(file_path, '*.pdf')):
         file_name_txt=file_path_to_save+ "/"+ re.findall(r'\/([^\/]+)\.pdf',filename)[0]+".txt"
+#         print(file_name_txt)
         with open(file_name_txt, 'w') as file:
             text=''
             doc_opened=fitz.open(filename)
@@ -25,14 +26,17 @@ def pdf_to_txt_book(file_path,file_path_to_save):
                     block_text=output[j][4]
                     if block_text.startswith('Table') or block_text.startswith('Figure'):
                         continue
-                    elif len(re.findall(r'\.',block_text))>30:
+                    elif len(re.findall(r'\.',block_text))>=30:
                         continue
                     elif (len(re.findall('\n', output[j][4]))/len(output[j][4])<=thrshold) and (output[j][6] == 0) :
                         temp= block_text.replace('-\n','')
-                        text_to_write += temp.replace('\n', ' ')+ "\n"
+                        temp_2 = re.sub(r'\([^)]*,?\d{4}[a-z]*\)', '', temp)
+                        result = re.sub(r'\[[^\]]*\]','', temp_2)
+                        text_to_write += result.replace('\n', ' ')
                     else:
                         continue
-            file.write(text_to_write)
+            file.write(text_to_write.replace('\n', ' '))
+            
             
 #file_path: folder path for paper pdf  
 #file_path_to_save: folder path for all ouput txt file            
@@ -44,7 +48,7 @@ def pdf_to_txt_paper(file_path,file_path_to_save):
             doc_opened=fitz.open(filename)
             for page in doc_opened:
                 text += page.get_text()
-            thrshold=len(re.findall('\n', text))/len(text)
+            thrshold=len(re.findall('\n', text))/(len(text))
             text_to_write=''
             for i in range(len(doc_opened)):
                 page=doc_opened[i]
@@ -55,12 +59,14 @@ def pdf_to_txt_paper(file_path,file_path_to_save):
                         continue
                     elif re.match(r'^[1-9][a-f]+', block_text):
                         continue
-                    elif (len(re.findall('\n', output[j][4]))/len(output[j][4])<=thrshold) and (output[j][6] == 0) :
+                    elif (len(re.findall('\n', block_text))/len(block_text)<=thrshold) and (output[j][6] == 0) :
                         temp= block_text.replace('-\n','')
-                        text_to_write += temp.replace('\n', ' ')+ "\n"
+                        temp_2 = re.sub(r'\([^)]*,?\d{4}[a-z]*\)', '', temp)
+                        result = re.sub(r'\[[^\]]*\]','', temp_2)
+                        text_to_write += result.replace('\n', ' ')
                     else:
                         continue
-            file.write(text_to_write)
+            file.write(text_to_write.replace('\n', ' '))
             
             
 #file_path: folder path for slides pdf  
@@ -85,7 +91,7 @@ def pdf_to_txt_slides(file_path,file_path_to_save):
                         text_to_write+=block_text+". "
                     else:
                         text_to_write+=block_text
-            file.write(text_to_write)    
+            file.write(text_to_write.replace('\n', ' ').replace('\n',  "●"))    
 
 #file_path: folder path for latex pdf 
 #file_path_img: folder path for changed image from latex pdf
@@ -94,7 +100,7 @@ def pdf_to_txt_latex(file_path, file_path_img, file_path_to_save):
     for filename in glob.glob(os.path.join(file_path, '*.pdf')):
         file_name_txt=file_path_to_save+ "/"+ re.findall(r'\/([^\/]+)\.pdf',filename)[0]+".txt"
 #         file_name_img=file_path_img+"/"+re.findall(r'\/([^\/]+)\.pdf',filename)[0]+' '+str(count)+'.jpeg'
-#         print(filename)
+        print(filename)
         images = convert_from_path(filename)
         text_to_write=''
         for i in range(len(images)):
@@ -102,11 +108,14 @@ def pdf_to_txt_latex(file_path, file_path_img, file_path_to_save):
             images[i].save(file_name_img, 'PNG')
             image=Image.open(file_name_img)
             text=pytesseract.image_to_string(image)
-            pattern = r'\d{1,2}\/\d{1,2}\/\d{2}, \d{1,2}:\d{2}'
+            pattern = r'\d{1,2}/\d{1,2}/\d{2,4}, \d{1,2}:\d{2} [APMapm]{2}'
             temp= re.sub(pattern, '', text)
-            text_to_write+=temp
+            temp2=re.sub(r'Page \d+ of \d+', '', temp)
+            temp3 = re.sub(r'\([^)]*,?\d{4}[a-z]*\)', '', temp2)
+            result= re.sub(r'\[[^\]]*\]','', temp3)
+            text_to_write+=result.replace('\n', ' ')
         with open(file_name_txt, 'w') as file:
-            file.write(text_to_write)  
+            file.write(text_to_write.replace('-\n','').replace('\n', ' '))  
             file.close()
             
             

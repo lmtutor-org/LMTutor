@@ -96,7 +96,7 @@ class LLMLangChainTutor():
     #     print(len(docs))
     #     text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap) ### hyperparams
     #     self.splitted_documents = text_splitter.split_documents(docs)
-    def load_document(self, doc_path, glob='*.txt', chunk_size=480, chunk_overlap=0 ,separators=[". "]):
+    def load_document(self, doc_path, glob='*.txt', chunk_size=300, chunk_overlap=0 ,separators=[". "]):
         docs = self.doc_loader(doc_path, 
                                glob=glob, 
                                show_progress=True, 
@@ -107,7 +107,10 @@ class LLMLangChainTutor():
                                         tokenizer,
                                         chunk_size=chunk_size, 
                                         chunk_overlap=chunk_overlap, 
-                                        separators=separators) ### hyperparams
+                                        separators=separators,
+                                        keep_separator=True,
+                                        keep_separator=False) ### hyperparams
+        
         self.splitted_documents = text_splitter.split_documents(docs)
     
     def generate_vector_store(self):
