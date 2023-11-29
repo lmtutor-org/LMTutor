@@ -1,0 +1,5 @@
+evaluation/*.csv
+evaluation/*/*.csv
+evaluation/*/*.txt
+*.pyc
+launch.json
