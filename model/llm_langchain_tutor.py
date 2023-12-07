@@ -26,6 +26,63 @@ PIPELINE_TYPE = {
     'lmsys/vicuna-13b-v1.5': 'text-generation'
 }
 
+class QuestionBasedRecursiveTextSplitter(RecursiveCharacterTextSplitter):
+    def __init__(self, *args, **kwargs):
+        super(QuestionBasedRecursiveTextSplitter, self).__init__(*args, **kwargs)
+        anthropic_key = os.environ['ANTHROPIC_API']
+        self.llm = Anthropic(model="claude-2", anthropic_api_key=anthropic_key)
+
+    def create_documents(
+        self, texts, metadatas=None
+    ):
+        """Create documents from a list of texts."""
+        _metadatas = metadatas or [{}] * len(texts)
+        documents = []
+        for i, text in enumerate(tqdm(texts)):
+            index = -1
+            for chunk in self.split_text(text):
+                metadata = copy.deepcopy(_metadatas[i])
+                if self._add_start_index:
+                    index = text.find(chunk, index + 1)
+                    metadata["start_index"] = index
+                metadata["page_content"] = chunk
+
+                questions = self.topics_from_chunk(chunk)
+
+                for question in questions:
+                    new_doc = Document(page_content=question, metadata=metadata)
+                    documents.append(new_doc)
+        return documents
+
+    def topics_from_chunk(self, doc):
+        # Create the template
+        template_string = '''Generate three questions that could be answered
+        using information conatined in the following text: {doc}. The questions must
+        be different and should focus on different topics covered in this text. Strictly
+        do not provide any introduction or conclusion. Only provide a list of questions
+        using the following template.
+        - (Question 1 based on text)
+        - (Question 2 based on text)
+        - (Question 3 based on text)
+        \n\nAssistant:
+        '''
+
+        # LLM call
+        prompt_template = ChatPromptTemplate.from_template(template_string)
+
+        try:
+            chain = LLMChain(llm=self.llm, prompt=prompt_template)
+            response = chain.run({
+                "doc" : doc,
+                })
+            
+            questions = [q.strip("- ") for q in response.split("\n\n")[1:]]
+        except:
+            questions = []
+        
+        print(questions)
+        return questions
+
 
 class LLMLangChainTutor():
     def __init__(self, doc_loader='dir', embedding='instruct_embedding', llm='hf_lmsys/vicuna-13b-v1.5', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cuda',llm_device='cuda') -> None:
@@ -169,7 +226,7 @@ class LLMLangChainTutor():
 
     def similarity_search_thres(self, query, thres=0.8):
         retrieval_result  = self.gen_vectorstore.similarity_search_with_score(query, k=10)
-        retrieval_result = [(d[0].page_content, d[0].metadata['source'], d[1]) for d in retrieval_result]
+        retrieval_result = [(d[0].metadata['page_content'], d[0].page_content, d[0].metadata['source'], d[1]) for d in retrieval_result]
         return retrieval_result
 
 
