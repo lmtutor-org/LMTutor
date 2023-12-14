@@ -1,5 +1,5 @@
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.embeddings import HuggingFaceInstructEmbeddings
+from langchain.embeddings import HuggingFaceInstructEmbeddings, HuggingFaceEmbeddings
 from langchain.vectorstores import Chroma, FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.llms import OpenAI
@@ -28,14 +28,14 @@ PIPELINE_TYPE = {
 
 
 class LLMLangChainTutor():
-    def __init__(self, doc_loader='dir', embedding='instruct_embedding', llm='hf_lmsys/vicuna-13b-v1.5', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cuda',llm_device='cuda') -> None:
+    def __init__(self, doc_loader='dir', embedding='instruct_embedding', embedding_path='', llm='hf_lmsys/vicuna-13b-v1.5', vector_store='faiss', langchain_mod='conversational_retrieval_qa', openai_key=None, embed_device='cuda',llm_device='cuda') -> None:
         self.openai_key = openai_key
         self.llm_name = llm
         self.embed_device = embed_device
         self.llm_device = llm_device
 
         self._document_loader(doc_loader=doc_loader)
-        self._embedding_loader(embedding=embedding)
+        self._embedding_loader(embedding=embedding, embedding_path=embedding_path)
         self._vectorstore_loader(vector_store=vector_store)
         self._memory_loader()
 
@@ -43,13 +43,17 @@ class LLMLangChainTutor():
         if doc_loader == 'dir':
             self.doc_loader = DirectoryLoader
     
-    def _embedding_loader(self, embedding):
+    def _embedding_loader(self, embedding, embedding_path):
         if embedding == 'openai':
             os.environ['OPENAI_API_KEY'] = self.openai_key
             self.embedding_model = OpenAIEmbeddings()
         
         elif embedding == 'instruct_embedding':
             self.embedding_model = HuggingFaceInstructEmbeddings(query_instruction="Represent the query for retrieval: ", model_kwargs={'device':self.embed_device}, encode_kwargs={'batch_size':32})
+        elif embedding == 'finetuned':
+            print("loading finetuned embedding model")
+            # self.embedding_model = HuggingFaceEmbeddings(model_name=embedding_path, model_kwargs={'device':self.embed_device}, encode_kwargs={'batch_size':32})
+            self.embedding_model = HuggingFaceEmbeddings(model_name=embedding_path)
     
     
     def _vectorstore_loader(self, vector_store):
