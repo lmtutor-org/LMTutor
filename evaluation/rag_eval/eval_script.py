@@ -24,7 +24,7 @@ def lmt_norag(data_dir, q_path):
     lmt.generate_answers(RAG_eval=False)
     lmt.save_ans_as_csv(lmt_no_rag_path)
 
-def lmt_arg(data_dir, q_path, vs_path):    
+def lmt_rag(data_dir, q_path, vs_path):    
     dir_path, \
     lmtans_save_path, \
     claudeans_save_path, \
@@ -52,7 +52,7 @@ def temp(data_dir, q_path):
 
     pass
 
-def eval(vs_path, data_dir):
+def eval(vs_path, data_dir, compare_to_claude = True):
     dir_path, \
     lmtans_save_path, \
     claudeans_save_path, \
@@ -70,39 +70,25 @@ def eval(vs_path, data_dir):
             break
     assert ans_col is not None
     
-    claude_norag = pd.read_csv(data_dir / Path("claude_noRAG.csv"))
-    base_col = 'claude_noRAG'
+    if compare_to_claude:
+        base_col = 'claude_noRAG'
+        claude_norag = pd.read_csv(data_dir / Path("claude_noRAG.csv"))
+        ans_df = pd.merge(lmt_rag, claude_norag[['questions', base_col]], on='questions')
+    else:
+        base_col = 'gpt_noRAG'
+        gpt_norag = pd.read_csv(data_dir / Path("gpt_noRAG.csv"))  # ans from gpt-128k
+        ans_df = pd.merge(lmt_rag, gpt_norag[['questions', base_col]], on='questions')
 
-    ans_df = pd.merge(lmt_rag, claude_norag[['questions', 'claude_noRAG']], on='questions')
+
     # change this part for different eval + ans_dict row names
+    
+    rag_eval = LMTutorRAGEvaluator('gpt-4')
+    # ans_df = ans_df.head(5)
 
+    result_df, opt_count = rag_eval.unbiased_evaluate(ans_df, ans_col, base_col)
 
-    rag_eval = LMTutorRAGEvaluator('chatgpt')
-    response = []
-    chosen_options = []
-    for idx in tqdm(range(len(ans_df)), desc="evaluating"):
-        row = ans_df.iloc[idx]
-        ans_dict = {
-            'lmtans_RAG': row[ans_col],
-            'claude_noRAG': row[base_col],
-            'ground_truth': row['ground_truth'],
-        }
-
-        curr_response = rag_eval.evaluate(row['questions'], ans_dict)
-
-        response.append(curr_response)
-        chosen_options.append(curr_response['option_chosen'])
-
-    opt_count = {}
-    for opt in chosen_options:
-        if opt not in opt_count:
-            opt_count[opt] = 1
-        else:
-            opt_count[opt] += 1
-
-    result = pd.DataFrame(response)
-    result_path = dir_path / Path(f"{ans_col}__{base_col}.csv")
-    result.to_csv(result_path)
+    result_path = dir_path / Path(f"{ans_col}__{base_col}_result.csv")
+    result_df.to_csv(result_path, index=False)
 
     with open(result_txt_path, 'a') as f:
         f.write(str(opt_count))
@@ -111,15 +97,29 @@ def eval(vs_path, data_dir):
     
     print(opt_count)
 
+def plot_result(vs_path, data_dir):
+    dir_path, \
+    lmtans_save_path, \
+    claudeans_save_path, \
+    gptans_save_path, \
+    result_txt_path = set_up_dir(vs_path)
+    vs_name = vs_path.parts[-1]
+
+    result_path = dir_path / Path(f"lmt_DSC-250-vector-w-291_RAG__claude_noRAG_result.csv")
+    ans_col = 'lmt_DSC-250-vector-w-291_RAG'
+    base_col = 'claude_noRAG'
+    plot_dist_graph(dir_path, result_path, ans_col, base_col)
 
 def main():
     data_dir = Path("/home/hao.zhang/axie/LMTutor/LMTutor/evaluation/data/")
     q_path = data_dir / Path("questions.csv")
     vs_path = Path("/home/hao.zhang/axie/LMTutor/DSC_291_vector_fineemb/")
-    vs_path = Path("/home/hao.zhang/axie/LMTutor/DSC-291-vector_2/")
-    vs_path = Path("/home/hao.zhang/axie/LMTutor/DSC-250-vector-w-291/")
+    # vs_path = Path("/home/hao.zhang/axie/LMTutor/DSC-291-vector_2/")
+    # vs_path = Path("/home/hao.zhang/axie/LMTutor/DSC-250-vector-w-291/")
 
     eval(vs_path, data_dir)
+    # plot_result(vs_path, data_dir)
+
 
     # temp(data_dir, q_path)
     
@@ -127,7 +127,7 @@ def main():
     # gpt_norag(data_dir, q_path)
     # lmt_norag(data_dir, q_path)
     
-    # lmt_arg(data_dir, q_path, vs_path)
+    # lmt_rag(data_dir, q_path, vs_path)
     pass
 
 
