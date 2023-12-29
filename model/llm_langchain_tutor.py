@@ -149,8 +149,14 @@ class LLMLangChainTutor():
 
     def similarity_search_topk(self, query, FIRST_PROMPT, k=4):
         retrieved_docs = self.gen_vectorstore.similarity_search(query, k=k)
+        doc_set = set()
+        retrieval_resuls = []
+        for doc in retrieved_docs:
+            if doc.metadata['page_content'] not in doc_set:
+                retrieval_resuls.append(doc)
+                doc_set.add(doc.metadata['page_content'])
 
-        return self.limit_ctx_len(retrieved_docs, query, FIRST_PROMPT)
+        return self.limit_ctx_len(retrieval_resuls, query, FIRST_PROMPT)
     
     # def similarity_search_thres(self, query, FIRST_PROMPT, thres=0.8):
     #     retrieval_result  = self.gen_vectorstore.similarity_search_with_score(query, k=10)
@@ -162,7 +168,7 @@ class LLMLangChainTutor():
         # model length, context length, question length
         num_ctx = len(retrieved_docs)
         context = retrieved_docs[:num_ctx]
-        context_len = len(" \n ".join([each.page_content for each in context]))
+        context_len = len(" \n ".join([each.metadata['page_content'] for each in context]))
         model_len = self.tokenizer.model_max_length if self.tokenizer is not None else 1024*32
         query_len = len(query)
         pt_len = len(FIRST_PROMPT)
@@ -181,7 +187,7 @@ class LLMLangChainTutor():
             # return self.qa({'question': user_input})
             FIRST_PROMPT = "A chat between a student user and a teaching assistant. The assistant gives helpful, detailed, and polite answers to the user's questions based on the context.\n"
             PROMPT_TEMPLTATE = "CONTEXT: {context} \n USER: {user_input} \n ASSISTANT:"
-            context = " \n ".join([each.page_content for each in self.similarity_search_topk(user_input, FIRST_PROMPT, k=5)])
+            context = " \n ".join([each.metadata['page_content'] for each in self.similarity_search_topk(user_input, FIRST_PROMPT, k=5)])
             if self.first_conversation:
                 prompt = FIRST_PROMPT + PROMPT_TEMPLTATE.format(context=context, user_input=user_input)
                 self.first_conversation = False
